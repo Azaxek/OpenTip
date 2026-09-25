@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      # No database service needed: tests run the real migrations on in-process Postgres (PGlite).
+      # This step enforces the anonymity rules: no identifying columns, privacy notice == schema, EXIF/metadata
+      # stripping, rate limits, cross-tenant isolation (RLS), retention purge, escalation logging.
+      - run: npm test
+      - run: npm run build
+        env:
+          APP_SECRET: ci-only-secret-ci-only-secret-ci-only-1234
