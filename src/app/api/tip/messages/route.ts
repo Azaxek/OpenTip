@@ -1,0 +1,29 @@
+import { fail, json, publicPost } from '@/lib/http';
+import { rateLimit } from '@/lib/ratelimit';
+import { InputError, getTipStatus, listTipsterMessages, postTipsterMessage, tipsterFromRequest } from '@/lib/tipster';
+
+/** Live-chat poll: new messages since a cursor, plus the current status. Cheap when nothing changed. */
+export async function GET(req: Request) {
+  const limited = rateLimit(req, 'tip-poll', 90, 60_000);
+  if (limited) return limited;
+  const who = tipsterFromRequest(req);
+  if (!who) return fail('Please sign in again.', 401);
+  const since = Math.max(0, parseInt(new URL(req.url).searchParams.get('since') ?? '0', 10) || 0);
+  const status = await getTipStatus(who.orgId, who.tipUuid);
+  if (!status) return fail('Please sign in again.', 401);
+  return json({ status, messages: await listTipsterMessages(who.orgId, who.tipUuid, since) });
+}
+
+export async function POST(req: Request) {
+  const r = await publicPost(req, 'tip-message', 30, 10 * 60_000, { turnstile: false, maxBytes: 12_000 });
+  if ('res' in r) return r.res;
+  const who = tipsterFromRequest(req);
+  if (!who) return fail('Please sign in again.', 401);
+  try {
+    await postTipsterMessage(who.orgId, who.tipUuid, r.body.body);
+    return json({ ok: true });
+  } catch (e) {
+    if (e instanceof InputError) return fail(e.message);
+    throw e;
+  }
+}
