@@ -10,5 +10,5 @@ const server = new PGLiteSocketServer({ db, port, host: '127.0.0.1' });
 await server.start();
 const url = `postgres://postgres:postgres@127.0.0.1:${port}/postgres`;
 await runMigrations(url);
-console.log(`\nLocal dev database ready. Put this in .env.local:\nDATABASE_URL=${url}\nPG_POOL_MAX=1\n`);
+console.log(`\nLocal dev database ready. Put this in .env.local:\nDATABASE_URL=${url}\nPG_POOL_MAX=1\nPG_SIMPLE_PROTOCOL=1\n`);
 process.on('SIGINT', async () => { await server.stop(); await db.close(); process.exit(0); });
