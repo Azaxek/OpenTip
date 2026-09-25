@@ -9,3 +9,6 @@ node_modules/
 next-env.d.ts
 coverage/
 .claude/
+!.env.demo.example
+
+.vercel
