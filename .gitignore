@@ -1,0 +1,11 @@
+node_modules/
+.next/
+.env
+.env.*
+!.env.example
+.pglite/
+.storage/
+*.tsbuildinfo
+next-env.d.ts
+coverage/
+.claude/
