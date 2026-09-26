@@ -32,23 +32,23 @@ const hammer = async (handler: (r: Request) => Promise<Response>, mk: () => Requ
 };
 
 describe('rate limits on public endpoints', () => {
-  it('submission: 10 per hour per client, then 429 with Retry-After', async () => {
+  it('submission: 60 per hour per address (a school shares one), then 429 with Retry-After', async () => {
     const { cat } = await setup();
     const client = ip();
-    const codes = await hammer(submit, () => from(client, { categoryId: cat, description: 'spam', passcode: 'abcdef' }), 10);
-    expect(codes.slice(0, 10).every((c) => c === 200)).toBe(true);
-    expect(codes.slice(10)).toEqual([429, 429]);
+    const codes = await hammer(submit, () => from(client, { categoryId: cat, description: 'spam', passcode: 'abcdef' }), 60);
+    expect(codes.slice(0, 60).every((c) => c === 200)).toBe(true);
+    expect(codes.slice(60)).toEqual([429, 429]);
     const blocked = await submit(from(client, {}));
     expect(blocked.headers.get('retry-after')).toBeTruthy();
     expect((await submit(from(ip(), { categoryId: cat, description: 'ok', passcode: 'abcdef' }))).status).toBe(200); // other clients unaffected
   });
 
-  it('login: 10 attempts per 15 minutes per client, then 429', async () => {
+  it('login: 60 attempts per 15 minutes per address, then 429 (per-TIP-ID lockout stops guessing long before)', async () => {
     const { tip } = await setup();
     const client = ip();
-    const codes = await hammer(login, () => from(client, { tipId: tip.tipId, passcode: 'wrong' }), 10);
-    expect(codes.slice(0, 10).every((c) => c === 401)).toBe(true);
-    expect(codes.slice(10)).toEqual([429, 429]);
+    const codes = await hammer(login, () => from(client, { tipId: tip.tipId, passcode: 'wrong' }), 60);
+    expect(codes.slice(0, 60).every((c) => c === 401)).toBe(true);
+    expect(codes.slice(60)).toEqual([429, 429]);
   });
 
   it('login answers wrong ID, wrong passcode and locked identically', async () => {
@@ -64,17 +64,17 @@ describe('rate limits on public endpoints', () => {
     const bearer = { authorization: `Bearer ${tip.token}` };
     const client = ip();
     expect((await claimReveal(from(ip(), {}))).status).toBe(401); // no token
-    const codes = await hammer(claimReveal, () => from(client, {}, bearer), 10);
-    expect(codes.slice(0, 10).every((c) => c === 200)).toBe(true);
-    expect(codes.slice(10)).toEqual([429, 429]);
-    expect(await (await claimReveal(from(ip(), {}, bearer))).json()).toEqual({ notEligible: true });
+    expect(await (await claimReveal(from(ip(), {}, bearer))).json()).toEqual({ notEligible: true }); // never leaks a code for an ineligible tip
+    const codes = await hammer(claimReveal, () => from(client, {}, bearer), 9); // limited per tip (one call already used)
+    expect(codes.slice(0, 9).every((c) => c === 200)).toBe(true);
+    expect(codes.slice(9)).toEqual([429, 429]);
   });
 
   it('upload init and chat messages are limited too', async () => {
     const { tip } = await setup();
     const c1 = ip();
-    const up = await hammer(uploadInit, () => from(c1, { files: [] }), 20);
-    expect(up.slice(20)).toEqual([429, 429]);
+    const up = await hammer(uploadInit, () => from(c1, { files: [] }), 120);
+    expect(up.slice(120)).toEqual([429, 429]);
     const c2 = ip();
     const msg = await hammer(postMessage, () => from(c2, { body: 'hi' }, { authorization: `Bearer ${tip.token}` }), 30);
     expect(msg.slice(30)).toEqual([429, 429]);

@@ -3,7 +3,7 @@ import { getOrg } from '@/lib/org';
 import { tipsterLogin } from '@/lib/tipster';
 
 export async function POST(req: Request) {
-  const r = await publicPost(req, 'tip-login', 10, 15 * 60_000, { maxBytes: 2_000 });
+  const r = await publicPost(req, 'tip-login', 60, 15 * 60_000, { maxBytes: 2_000 });
   if ('res' in r) return r.res;
   const org = await getOrg();
   if (!org) return fail('Not set up', 503);

@@ -15,7 +15,7 @@ const Body = z.object({
 });
 
 export async function POST(req: Request) {
-  const r = await publicPost(req, 'submit', 10, 3_600_000, { maxBytes: 30_000 });
+  const r = await publicPost(req, 'submit', 60, 3_600_000, { maxBytes: 30_000 });
   if ('res' in r) return r.res;
   const parsed = Body.safeParse(r.body);
   if (!parsed.success) return fail('Please check the form and try again. Passcodes need at least 6 characters.');

@@ -4,10 +4,10 @@ import { InputError, getTipStatus, listTipsterMessages, postTipsterMessage, tips
 
 /** Live-chat poll: new messages since a cursor, plus the current status. Cheap when nothing changed. */
 export async function GET(req: Request) {
-  const limited = rateLimit(req, 'tip-poll', 90, 60_000);
-  if (limited) return limited;
   const who = tipsterFromRequest(req);
   if (!who) return fail('Please sign in again.', 401);
+  const limited = rateLimit(req, 'tip-poll', 60, 60_000, who.tipUuid);
+  if (limited) return limited;
   const since = Math.max(0, parseInt(new URL(req.url).searchParams.get('since') ?? '0', 10) || 0);
   const status = await getTipStatus(who.orgId, who.tipUuid);
   if (!status) return fail('Please sign in again.', 401);
@@ -15,10 +15,12 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const r = await publicPost(req, 'tip-message', 30, 10 * 60_000, { turnstile: false, maxBytes: 12_000 });
+  const r = await publicPost(req, 'tip-message', 300, 10 * 60_000, { turnstile: false, maxBytes: 12_000 });
   if ('res' in r) return r.res;
   const who = tipsterFromRequest(req);
   if (!who) return fail('Please sign in again.', 401);
+  const limited = rateLimit(req, 'tip-message', 30, 10 * 60_000, who.tipUuid);
+  if (limited) return limited;
   try {
     await postTipsterMessage(who.orgId, who.tipUuid, r.body.body);
     return json({ ok: true });

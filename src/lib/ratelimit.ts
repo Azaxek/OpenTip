@@ -7,10 +7,11 @@ export function clientIp(req: Request): string {
   return req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || req.headers.get('x-real-ip') || 'unknown';
 }
 
-/** Returns a 429 Response when over the limit, otherwise null. */
-export function rateLimit(req: Request, name: string, max: number, windowMs: number): Response | null {
+/** Returns a 429 Response when over the limit, otherwise null. Anonymous endpoints key on the client address; keep those generous, shared networks (schools, carriers) put many people behind one address. */
+export function rateLimit(req: Request, name: string, max: number, windowMs: number, subject?: string): Response | null {
   const now = Date.now();
-  const key = `${name}|${clientIp(req)}`;
+  // Signed-in actions are limited per tip (a random id, held in memory only) so one busy school network cannot starve everyone on it.
+  const key = `${name}|${subject ?? clientIp(req)}`;
   const recent = (hits.get(key) ?? []).filter((t) => now - t < windowMs);
   if (recent.length >= max) {
     hits.set(key, recent);
