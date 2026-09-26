@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { PageTitle } from './ui';
 
 const TABS: [string, string][] = [
   ['/staff/settings', 'Organization & escalation'],
@@ -9,10 +10,13 @@ const TABS: [string, string][] = [
 
 export function SettingsNav({ current }: { current: string }) {
   return (
+    <>
+    <PageTitle>Settings</PageTitle>
     <nav className="mb-4 flex flex-wrap gap-2" aria-label="Settings sections">
       {TABS.map(([href, label]) => (
         <Link key={href} href={href} aria-current={href === current ? 'page' : undefined} className={`btn !min-h-9 text-sm ${href === current ? '!bg-slate-900 !text-white' : ''}`}>{label}</Link>
       ))}
     </nav>
+    </>
   );
 }

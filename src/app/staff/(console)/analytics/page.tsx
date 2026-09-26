@@ -1,5 +1,5 @@
 import { HBars, Stat, VBars } from '@/components/staff/Charts';
-import { Card } from '@/components/staff/ui';
+import { Card, PageTitle } from '@/components/staff/ui';
 import { report } from '@/lib/analytics';
 import { withOrg } from '@/lib/db';
 import { requireAdmin } from '@/lib/session';
@@ -25,6 +25,7 @@ export default async function Analytics({ searchParams }: { searchParams: Promis
   const sel = 'input !py-1.5 text-sm';
   return (
     <div className="space-y-4">
+      <PageTitle>Analytics</PageTitle>
       <form method="get" className="card grid grid-cols-2 items-end gap-3 md:grid-cols-6">
         <label className="text-xs font-semibold">From<input type="date" name="from" defaultValue={from} className={sel} /></label>
         <label className="text-xs font-semibold">To<input type="date" name="to" defaultValue={to} className={sel} /></label>

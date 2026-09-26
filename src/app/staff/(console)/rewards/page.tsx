@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Card, Flash, when } from '@/components/staff/ui';
+import { Card, Flash, PageTitle, when } from '@/components/staff/ui';
 import { withOrg } from '@/lib/db';
 import { requireStaff } from '@/lib/session';
 import { visible } from '@/lib/staff';
@@ -19,6 +19,7 @@ export default async function Rewards({ searchParams }: { searchParams: Promise<
   );
   return (
     <div className="space-y-4">
+      <PageTitle>Rewards</PageTitle>
       <Flash e={sp.e} ok={sp.ok} />
       <Card title="Redeem a claim code">
         <form action={redeemAction} className="grid gap-3 sm:grid-cols-3">

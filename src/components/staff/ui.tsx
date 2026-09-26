@@ -5,6 +5,8 @@ const TONE: Record<string, string> = { new: 'bg-blue-100 text-blue-900', under_r
 
 export const StatusBadge = ({ status }: { status: string }) => <span className={`badge ${TONE[status] ?? TONE.closed}`}>{STATUS_LABEL[status] ?? status}</span>;
 
+export const PageTitle = ({ children }: { children: ReactNode }) => <h1 className="mb-4 text-2xl font-extrabold">{children}</h1>;
+
 export const UrgentBadge = () => <span className="badge bg-red-700 text-white">URGENT</span>;
 
 /** Red/green banners driven by ?e= and ?ok= so server actions can report problems without crashing. */

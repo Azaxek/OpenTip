@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Flash, StatusBadge, UrgentBadge, ago } from '@/components/staff/ui';
+import { Flash, PageTitle, StatusBadge, UrgentBadge, ago } from '@/components/staff/ui';
 import { withOrg } from '@/lib/db';
 import { listQueue, type QueueFilter } from '@/lib/queue';
 import { requireStaff } from '@/lib/session';
@@ -16,6 +16,9 @@ export default async function Queue({ searchParams }: { searchParams: Promise<SP
     urgent: sp.urgent === '1', sort: (['newest', 'oldest'] as const).find((x) => x === sp.sort) ?? 'priority',
   };
   const tips = await listQueue(s, f);
+  const everyOpen = await listQueue(s, {}); // unfiltered, for the summary line
+  const awaiting = everyOpen.filter((t: any) => t.needs_reply).length;
+  const urgentCount = everyOpen.filter((t: any) => t.priority).length;
   const opts = await withOrg(s.orgId, async (q) => ({
     categories: await q<{ id: string; name: string }>('select id, name from categories order by sort, name'),
     locations: await q<{ id: string; name: string }>('select id, name from locations order by name'),
@@ -25,7 +28,9 @@ export default async function Queue({ searchParams }: { searchParams: Promise<SP
   const sel = 'input !py-1.5 text-sm';
   return (
     <div className="space-y-4">
-      <Flash e={sp.e} />
+      <PageTitle>Queue</PageTitle>
+      <p className="-mt-2 text-sm text-slate-700" data-testid="queue-summary">{everyOpen.length} open · {awaiting} awaiting reply · {urgentCount} urgent or high-risk</p>
+      <Flash e={sp.e} ok={sp.ok} />
       <form method="get" className="card grid grid-cols-2 items-end gap-3 md:grid-cols-4 lg:grid-cols-8">
         <label className="text-xs font-semibold">Status
           <select name="status" defaultValue={sp.status ?? 'open'} className={sel}>

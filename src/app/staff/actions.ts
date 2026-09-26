@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 import { escalate } from '@/lib/escalation';
 import { getOrg } from '@/lib/org';
 import {
-  StaffInputError, addNote, assignTip, closeTip, redeemClaim, reissueClaimCode, sendReviewerMessage, setReward, setStatus, setTipTeams, setUrgent,
+  StaffInputError, addNote, canView, assignTip, closeTip, redeemClaim, reissueClaimCode, sendReviewerMessage, setReward, setStatus, setTipTeams, setUrgent,
 } from '@/lib/queue';
 import { rateLimit } from '@/lib/ratelimit';
 import { clearSessionCookie, headerRequest, requireStaff, sessionCookieValue, setSessionCookie } from '@/lib/session';
@@ -61,8 +61,19 @@ export const noteAction = async (fd: FormData) => run(tipPath(fd), (s) => addNot
 export const statusAction = async (fd: FormData) => run(tipPath(fd), (s) => setStatus(s, str(fd, 'tipId'), str(fd, 'status') as 'under_review' | 'actioned'));
 export const closeAction = async (fd: FormData) => run(tipPath(fd), (s) => closeTip(s, str(fd, 'tipId'), str(fd, 'reason'), str(fd, 'note')));
 export const urgentAction = async (fd: FormData) => run(tipPath(fd), (s) => setUrgent(s, str(fd, 'tipId'), str(fd, 'urgent') === '1'));
-export const assignAction = async (fd: FormData) => run(tipPath(fd), (s) => assignTip(s, str(fd, 'tipId'), str(fd, 'reviewerId') || null));
-export const routeAction = async (fd: FormData) => run(tipPath(fd), (s) => setTipTeams(s, str(fd, 'tipId'), fd.getAll('teamId').map(String)));
+/** After a change that can remove your own access (unrouting, reassigning), say so instead of leaving a bare 404. */
+async function leftQueueIfNoAccess(fd: FormData, what: string) {
+  const s = await requireStaff();
+  if (!(await canView(s, str(fd, 'tipId')))) redirect(`/staff?ok=${encodeURIComponent(`${what} You no longer have access to that tip, so it has left your queue.`)}`);
+}
+export async function assignAction(fd: FormData) {
+  await run(tipPath(fd), (s) => assignTip(s, str(fd, 'tipId'), str(fd, 'reviewerId') || null));
+  await leftQueueIfNoAccess(fd, 'Assignment saved.');
+}
+export async function routeAction(fd: FormData) {
+  await run(tipPath(fd), (s) => setTipTeams(s, str(fd, 'tipId'), fd.getAll('teamId').map(String)));
+  await leftQueueIfNoAccess(fd, 'Routing saved.');
+}
 export const rewardAction = async (fd: FormData) =>
   run(tipPath(fd), (s) => setReward(s, str(fd, 'tipId'), str(fd, 'eligible') === '1', Math.round(Number(str(fd, 'amount') || 0) * 100)));
 export const reissueAction = async (fd: FormData) => run(tipPath(fd), (s) => reissueClaimCode(s, str(fd, 'tipId')));

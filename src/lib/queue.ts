@@ -66,6 +66,9 @@ export async function listQueue(s: Staff, f: QueueFilter = {}) {
   );
 }
 
+/** True while the tip is still visible to this staff member (routing or assignment changes can remove access). */
+export const canView = (s: Staff, tipId: string) => withOrg(s.orgId, async (q) => !!(await guard(q, s, tipId)));
+
 export async function getTipDetail(s: Staff, tipId: string) {
   return withOrg(s.orgId, async (q) => {
     const base = await guard(q, s, tipId);

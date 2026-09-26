@@ -1,4 +1,4 @@
-import { Card } from '@/components/staff/ui';
+import { Card, PageTitle } from '@/components/staff/ui';
 import { defaultLetter, submitUrl } from '@/lib/materials';
 import { getOrg } from '@/lib/org';
 import { requireAdmin } from '@/lib/session';
@@ -10,6 +10,7 @@ export default async function Materials() {
   const org = (await getOrg())!;
   return (
     <div className="space-y-4">
+      <PageTitle>Rollout materials</PageTitle>
       <p className="text-sm text-slate-700">Everything you need to announce the tip line, generated from your settings. Points at <span className="font-mono">{submitUrl()}</span>. If that address is wrong, set APP_URL and redeploy.</p>
       <div className="grid gap-4 md:grid-cols-2">
         <Card title="Poster / flyer (PDF)">

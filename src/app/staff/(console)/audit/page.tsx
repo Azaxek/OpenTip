@@ -1,4 +1,4 @@
-import { Card, when } from '@/components/staff/ui';
+import { Card, PageTitle, when } from '@/components/staff/ui';
 import { withOrg } from '@/lib/db';
 import { requireAdmin } from '@/lib/session';
 
@@ -10,7 +10,9 @@ export default async function Audit() {
     q<any>("select actor, action, tip_ref, detail, created_at from audit_log where action <> 'tip.view' or created_at > now() - interval '7 days' order by id desc limit 300"),
   );
   return (
-    <Card title="Audit log (staff actions only; newest 300)">
+    <>
+    <PageTitle>Audit log</PageTitle>
+    <Card title="Newest 300 staff actions">
       <p className="mb-3 text-sm text-slate-600">Records who did what to which TIP ID. It never contains anything about tipsters, and it cannot be edited or deleted from inside the app.</p>
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
@@ -29,5 +31,6 @@ export default async function Audit() {
         </table>
       </div>
     </Card>
+    </>
   );
 }

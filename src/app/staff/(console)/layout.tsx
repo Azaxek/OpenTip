@@ -22,10 +22,11 @@ export default async function ConsoleLayout({ children }: { children: ReactNode 
   ];
   return (
     <div className="min-h-screen">
+      <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-white focus:p-2 focus:shadow">Skip to content</a>
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
           <Link href="/staff" className="font-bold" style={{ color: 'var(--brand)' }}>{org.name} · Console</Link>
-          <nav className="flex flex-wrap gap-4 text-sm">
+          <nav className="flex flex-wrap gap-4 text-sm" aria-label="Console">
             {nav.filter((n) => n[2]).map(([href, label]) => <Link key={href} href={href} className="link no-underline">{label}</Link>)}
           </nav>
           <form action={logoutAction} className="ml-auto flex items-center gap-3 text-sm">
@@ -39,7 +40,7 @@ export default async function ConsoleLayout({ children }: { children: ReactNode 
           Setup needs attention: {problems.map((p) => p.label).join('; ')}. <Link href="/staff/settings" className="link">See details</Link>
         </div>
       )}
-      <div className="mx-auto max-w-7xl p-4">{children}</div>
+      <main id="main" tabIndex={-1} className="mx-auto max-w-7xl p-4 outline-none">{children}</main>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { Card, Flash } from '@/components/staff/ui';
+import { Card, Flash, PageTitle } from '@/components/staff/ui';
 import { requireStaff } from '@/lib/session';
 import { changePasswordAction } from '../../admin-actions';
 
@@ -9,6 +9,7 @@ export default async function Account({ searchParams }: { searchParams: Promise<
   const sp = await searchParams;
   return (
     <div className="mx-auto max-w-md space-y-4">
+      <PageTitle>My account</PageTitle>
       <Flash e={sp.e} ok={sp.ok} />
       <Card title={`${s.name} — change password`}>
         <form action={changePasswordAction} className="space-y-3">
