@@ -61,6 +61,7 @@ Need to show it to someone? [DEMO.md](DEMO.md) puts a fully populated fictional 
 | [ESCALATION-PROTOCOL.md](ESCALATION-PROTOCOL.md) | A template **you** fill in: on-call rotation and 911-vs-app guidance |
 | [DEPLOYMENT.md](DEPLOYMENT.md) | Whoever sets up hosting |
 | [DEMO.md](DEMO.md) | Presenters: a ready-to-show demo deployment |
+| [UX-AUDIT-AND-ROADMAP.md](UX-AUDIT-AND-ROADMAP.md) | What was tested from the tipster, administrator and reviewer seats, what was fixed, and the plan to make this the best tip line |
 | [SECURITY.md](SECURITY.md) | Security and legal review: exactly what is and is not protected |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Developers |
 

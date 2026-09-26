@@ -41,7 +41,7 @@ Use it when a human needs to be alerted immediately. It emails your on-call peop
 * Alerts contain the TIP ID, the category and a link, never the tip's text.
 * Escalation does not call 911 or handle the situation. It gets a person's attention. Your protocol decides what that person does.
 
-Set it up under Settings → *Escalation* and People → *On call*. Test it regularly.
+Set it up under Settings → *Escalation* and People → *On call*. Then press **Send a test alert** (Settings, right-hand side). It sends a clearly-labelled test through every channel you configured and tells you, channel by channel, whether it got through. Do this after every change to on-call staff, and at least monthly.
 
 ## 5. Teams and routing
 
@@ -50,6 +50,13 @@ Settings → Categories, locations & teams.
 * Each category can send tips to one or more teams (the defaults send everything to a catch-all team plus specialists, for example self-harm → Counseling + Administration).
 * For districts, a team can be limited to certain locations (“Lincoln High counseling only sees Lincoln High tips”). Tick no locations for all.
 * Put staff on teams under People. Deleting a team means tips routed only to it become visible to admins and “see all tips” staff only.
+
+### What tipsters read after they submit
+
+Settings → *What tipsters read after they submit* has two boxes:
+
+* **What to expect:** shown above the chat. Say plainly when a person reads tips (for example “We read tips weekdays 8am to 4pm”). The default says the line is not monitored in real time. Never promise more coverage than you have.
+* **Help resources:** shown on the receipt and the status page as “Need help right now?”. Crisis lines, victim assistance, local numbers. The defaults are US examples; replace them with resources for your area.
 
 ## 6. Categories, locations and canned responses
 
@@ -95,3 +102,4 @@ Settings shows a **Server checklist**. Anything red must be fixed before launch;
 * “We don't record your name, phone, email, IP address or device.”
 * “Be careful what you write or photograph: details themselves can identify you.”
 * “In an emergency call 911. This form is not watched in real time.”
+* “If someone might see your screen, press **Quick exit** (or Esc twice): it clears this tab and opens a weather site.”
