@@ -20,6 +20,7 @@ export default async function SubmitPage() {
       <SubmitWizard
         orgName={org.name}
         hotline={org.hotline}
+        helpText={org.help_text}
         categories={categories}
         locations={locations}
         limits={{ imageMb: org.image_mb, docMb: org.doc_mb, avMb: org.av_mb, tipMb: org.tip_mb, maxFiles: org.max_files }}

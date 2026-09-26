@@ -68,7 +68,8 @@ describe('no request metadata is captured', () => {
       const src = read(f);
       expect(src, rel(f)).not.toMatch(/gtag|google-analytics|googletagmanager|segment\.|mixpanel|hotjar|plausible|posthog|fbq\(|clarity\.ms|@vercel\/analytics|next\/script/i);
       const hosts = [...src.matchAll(/https?:\/\/([a-z0-9.-]+)/gi)].map((m) => m[1]).filter((h) => !/^(localhost|www\.w3\.org)$/.test(h));
-      for (const h of hosts) expect(['challenges.cloudflare.com'], `${rel(f)} -> ${h}`).toContain(h);
+      // Turnstile is the only third party that loads. www.weather.com is only where the Quick Exit button navigates when tapped.
+      for (const h of hosts) expect(['challenges.cloudflare.com', ...(rel(f) === 'components/QuickExit.tsx' ? ['www.weather.com'] : [])], `${rel(f)} -> ${h}`).toContain(h);
     }
   });
 });

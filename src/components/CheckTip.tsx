@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { PushOptIn } from './PushOptIn';
 import { useTurnstile } from './Turnstile';
 
-type Status = { status: 'new' | 'under_review' | 'actioned' | 'closed'; created_at: string; category: string; reward_eligible: boolean; reward_amount_cents: number | null; claim_code_shown: boolean; claimed: boolean };
+type Status = { status: 'new' | 'under_review' | 'actioned' | 'closed'; created_at: string; category: string; reward_eligible: boolean; reward_amount_cents: number | null; claim_code_shown: boolean; claimed: boolean; note?: string; resources?: string };
 type Msg = { seq: string; sender: 'tipster' | 'reviewer'; body: string; created_at: string };
 
 const LABEL = { new: 'New', under_review: 'Under review', actioned: 'Actioned', closed: 'Closed' } as const;
@@ -13,15 +13,16 @@ const POLL_MS = 3000;
 
 export function CheckTip({ siteKey, vapidKey }: { siteKey?: string; vapidKey?: string }) {
   const [token, setToken] = useState<string | null | undefined>(undefined);
+  const [expired, setExpired] = useState(false);
   useEffect(() => { try { setToken(sessionStorage.getItem(TOKEN)); } catch { setToken(null); } }, []);
   if (token === undefined) return null;
   if (token) {
-    return <TipStatus token={token} vapidKey={vapidKey} onEnd={() => { try { sessionStorage.removeItem(TOKEN); } catch {} setToken(null); }} />;
+    return <TipStatus token={token} vapidKey={vapidKey} onEnd={(why) => { try { sessionStorage.removeItem(TOKEN); } catch {} setExpired(why === 'expired'); setToken(null); }} />;
   }
-  return <Login siteKey={siteKey} onToken={(t) => { try { sessionStorage.setItem(TOKEN, t); } catch {} setToken(t); }} />;
+  return <Login siteKey={siteKey} expired={expired} onToken={(t) => { try { sessionStorage.setItem(TOKEN, t); } catch {} setExpired(false); setToken(t); }} />;
 }
 
-function Login({ siteKey, onToken }: { siteKey?: string; onToken: (t: string) => void }) {
+function Login({ siteKey, onToken, expired }: { siteKey?: string; onToken: (t: string) => void; expired?: boolean }) {
   const [tipId, setTipId] = useState('');
   const [passcode, setPasscode] = useState('');
   const [error, setError] = useState('');
@@ -47,6 +48,7 @@ function Login({ siteKey, onToken }: { siteKey?: string; onToken: (t: string) =>
       }}
     >
       <h1 className="text-2xl font-extrabold">Check an existing tip</h1>
+      {expired && <p role="status" className="rounded-lg bg-amber-50 p-3 text-sm font-semibold text-amber-900">Your session ended, for your privacy. Enter your TIP ID and passcode again to keep chatting.</p>}
       <div>
         <label className="label" htmlFor="tid">TIP ID</label>
         <input id="tid" className="input font-mono uppercase tracking-wider" autoComplete="off" autoCapitalize="characters" spellCheck={false} placeholder="XXXX-XXXX-XXXX" value={tipId} onChange={(e) => setTipId(e.target.value)} required />
@@ -63,7 +65,7 @@ function Login({ siteKey, onToken }: { siteKey?: string; onToken: (t: string) =>
   );
 }
 
-function TipStatus({ token, vapidKey, onEnd }: { token: string; vapidKey?: string; onEnd: () => void }) {
+function TipStatus({ token, vapidKey, onEnd }: { token: string; vapidKey?: string; onEnd: (why?: 'expired') => void }) {
   const [status, setStatus] = useState<Status | null>(null);
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [text, setText] = useState('');
@@ -84,7 +86,7 @@ function TipStatus({ token, vapidKey, onEnd }: { token: string; vapidKey?: strin
         first = false;
         try {
           const r = await fetch(`/api/tip/messages?since=${since}`, { headers: auth, cache: 'no-store' });
-          if (r.status === 401) return onEnd();
+          if (r.status === 401) return onEnd('expired');
           if (r.ok && !stop) {
             const j = await r.json();
             setStatus(j.status);
@@ -159,6 +161,7 @@ function TipStatus({ token, vapidKey, onEnd }: { token: string; vapidKey?: strin
 
       <div className="card space-y-3">
         <h2 className="font-bold">Chat with a reviewer</h2>
+        {status.note && <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-700">{status.note}</p>}
         <div role="log" aria-live="polite" className="max-h-96 min-h-24 space-y-2 overflow-y-auto rounded-lg bg-slate-50 p-3">
           {msgs.length === 0 && <p className="text-sm text-slate-600">No messages yet. A reviewer may reply here. Check back, or turn on notifications below.</p>}
           {msgs.map((m) => (
@@ -176,8 +179,15 @@ function TipStatus({ token, vapidKey, onEnd }: { token: string; vapidKey?: strin
         </form>
       </div>
 
+      {status.resources && (
+        <section className="card border-blue-200 bg-blue-50" aria-labelledby="help-h">
+          <h2 id="help-h" className="font-bold text-blue-950">Need help right now?</h2>
+          <p className="mt-1 whitespace-pre-line text-sm text-blue-950">{status.resources}</p>
+        </section>
+      )}
+
       <PushOptIn vapidKey={vapidKey} token={token} />
-      <button className="btn w-full" onClick={onEnd}>Close and forget this tip on this device</button>
+      <button className="btn w-full" onClick={() => onEnd()}>Close and forget this tip on this device</button>
     </div>
   );
 }

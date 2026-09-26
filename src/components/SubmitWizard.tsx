@@ -1,33 +1,46 @@
 'use client';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { downloadTipCard } from '@/lib/card';
+import { checkEvidence, mimeOf, type EvidenceLimits } from '@/lib/evidence-check';
 import { EmergencyBanner } from './EmergencyBanner';
 import { PushOptIn } from './PushOptIn';
 import { useTurnstile } from './Turnstile';
 
 type Cat = { id: string; name: string; description: string; high_risk: boolean };
 type Loc = { id: string; name: string };
-type Limits = { imageMb: number; docMb: number; avMb: number; tipMb: number; maxFiles: number };
+type Limits = EvidenceLimits;
 type Result = { tipId: string; token: string; passcode: string; attachments: { stored: number; failed: number } };
 
-const EXT: Record<string, string> = {
-  jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif',
-  mp4: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm',
-  mp3: 'audio/mpeg', m4a: 'audio/x-m4a', wav: 'audio/wav', ogg: 'audio/ogg', pdf: 'application/pdf',
-};
-const mimeOf = (f: File) => f.type || EXT[f.name.split('.').pop()?.toLowerCase() ?? ''] || '';
-const kindOf = (m: string) => (m.startsWith('image/') ? 'image' : m === 'application/pdf' ? 'doc' : m.startsWith('video/') || m.startsWith('audio/') ? 'av' : '');
 const DRAFT = 'ot_draft';
+const OFFLINE = "We couldn't reach the server. Check your connection and try again. Nothing is lost: your answers are still on this screen.";
 
 async function post(path: string, body: unknown) {
-  const r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  let r: Response;
+  try {
+    r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  } catch {
+    throw new Error(OFFLINE);
+  }
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error || 'Something went wrong. Please try again.');
   return j;
 }
 
-export function SubmitWizard(props: { orgName: string; hotline: string | null; categories: Cat[]; locations: Loc[]; limits: Limits; accept: string; siteKey?: string; vapidKey?: string }) {
+/** Upload with progress (fetch cannot report upload progress). */
+function put(url: string, headers: Record<string, string>, file: File, onProgress: (pct: number) => void): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const x = new XMLHttpRequest();
+    x.open('PUT', url);
+    for (const [k, v] of Object.entries(headers)) x.setRequestHeader(k, v);
+    x.upload.onprogress = (e) => e.lengthComputable && onProgress(Math.round((e.loaded / e.total) * 100));
+    x.onload = () => (x.status >= 200 && x.status < 300 ? resolve() : reject(new Error('A file could not be uploaded. Please try again, or remove it and continue without it.')));
+    x.onerror = () => reject(new Error(OFFLINE));
+    x.send(file);
+  });
+}
+
+export function SubmitWizard(props: { orgName: string; hotline: string | null; helpText?: string; categories: Cat[]; locations: Loc[]; limits: Limits; accept: string; siteKey?: string; vapidKey?: string }) {
   const { categories, locations, limits } = props;
   const steps = useMemo(
     () => [...(locations.length > 1 ? ['location'] : []), 'category', 'urgent', 'description', ...(limits.maxFiles > 0 ? ['evidence'] : []), 'passcode'],
@@ -56,36 +69,52 @@ export function SubmitWizard(props: { orgName: string; hotline: string | null; c
       if (d.categoryId) setCategoryId(d.categoryId);
       if (typeof d.urgent === 'boolean') setUrgent(d.urgent);
       if (d.description) setDescription(d.description);
+      // Come back to the same screen, but never past the last content step: files and the passcode are deliberately not saved.
+      const lastContent = steps.indexOf(steps.includes('evidence') ? 'evidence' : 'description');
+      if (typeof d.i === 'number') setI(Math.max(0, Math.min(d.i, lastContent)));
     } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
-    if (!result) try { sessionStorage.setItem(DRAFT, JSON.stringify({ locationId, categoryId, urgent, description })); } catch {}
-  }, [locationId, categoryId, urgent, description, result]);
+    if (!result) try { sessionStorage.setItem(DRAFT, JSON.stringify({ locationId, categoryId, urgent, description, i })); } catch {}
+  }, [locationId, categoryId, urgent, description, i, result]);
   useEffect(() => { if (locations.length === 1) setLocationId(locations[0].id); }, [locations]);
 
   const previews = useMemo(() => files.map((f) => URL.createObjectURL(f)), [files]);
   useEffect(() => () => previews.forEach(URL.revokeObjectURL), [previews]);
 
-  function addFiles(list: FileList | null) {
+  function addFiles(list: FileList | File[] | null) {
     if (!list) return;
     const next = [...files];
     let msg = '';
     for (const f of Array.from(list)) {
-      const kind = kindOf(mimeOf(f));
-      const cap = (kind === 'image' ? limits.imageMb : kind === 'doc' ? limits.docMb : limits.avMb) * 1048576;
-      if (!kind) msg = `"${f.name}" is not a supported type. Use photos, video, audio or PDF.`;
-      else if (f.size > cap) msg = `"${f.name}" is over the ${cap / 1048576} MB limit for that kind of file.`;
-      else if (next.length >= limits.maxFiles) msg = `You can attach up to ${limits.maxFiles} files.`;
-      else if (next.reduce((n, x) => n + x.size, f.size) > limits.tipMb * 1048576) msg = `Attachments can total up to ${limits.tipMb} MB.`;
+      const problem = checkEvidence(f, next, limits);
+      if (problem) msg = problem;
       else next.push(f);
     }
     setError(msg);
     setFiles(next);
   }
 
+  // Keyboard and screen-reader users: move focus to the new step so it is announced.
+  const stepRef = useRef<HTMLDivElement>(null);
+  const firstRender = useRef(true);
+  useEffect(() => {
+    if (firstRender.current) { firstRender.current = false; return; }
+    stepRef.current?.focus();
+  }, [i]);
+
+  const [pct, setPct] = useState<number | null>(null);
+  const [dragging, setDragging] = useState(false);
+
   function canAdvance(): string {
     if (step === 'category' && !categoryId) return 'Please choose a category.';
     if (step === 'urgent' && urgent === null) return 'Please choose Yes or No.';
+    // Catch an empty tip on the last content step, not after the passcode has been typed.
+    const lastContentStep = steps.includes('evidence') ? 'evidence' : 'description';
+    if (step === lastContentStep && !description.trim() && files.length === 0) {
+      return steps.includes('evidence') ? 'Please go back and describe what you know, or attach evidence here.' : 'Please describe what you know.';
+    }
     return '';
   }
 
@@ -101,9 +130,10 @@ export function SubmitWizard(props: { orgName: string; hotline: string | null; c
         const init = await post('/api/upload/init', { files: files.map((f) => ({ mime: mimeOf(f), size: f.size })), turnstileToken: await getToken() });
         for (const [n, u] of (init.uploads as { key: string; url: string; headers: Record<string, string> }[]).entries()) {
           setBusy(`Uploading file ${n + 1} of ${files.length}…`);
-          const up = await fetch(u.url, { method: 'PUT', headers: u.headers, body: files[n] });
-          if (!up.ok) throw new Error('A file could not be uploaded. Please try again or remove it.');
+          setPct(0);
+          await put(u.url, u.headers, files[n], setPct);
         }
+        setPct(null);
         attachmentKeys = init.uploads.map((u: { key: string }) => u.key);
       }
       setBusy('Submitting…');
@@ -114,16 +144,18 @@ export function SubmitWizard(props: { orgName: string; hotline: string | null; c
       setError(e instanceof Error ? e.message : 'Something went wrong.');
     } finally {
       setBusy('');
+      setPct(null);
     }
   }
 
-  if (result) return <Receipt r={result} orgName={props.orgName} vapidKey={props.vapidKey} />;
+  if (result) return <Receipt r={result} orgName={props.orgName} vapidKey={props.vapidKey} helpText={props.helpText} />;
 
   const selected = categories.find((c) => c.id === categoryId);
   return (
     <div className="space-y-4">
       <EmergencyBanner />
       <form
+        noValidate // we show our own clear messages (announced to screen readers) instead of the browser's disappearing bubbles
         className="card space-y-5"
         onSubmit={(e) => {
           e.preventDefault();
@@ -134,6 +166,8 @@ export function SubmitWizard(props: { orgName: string; hotline: string | null; c
           else submit();
         }}
       >
+        <h1 className="sr-only">Submit an anonymous tip</h1>
+        <div ref={stepRef} tabIndex={-1} role="group" aria-label={`Step ${i + 1} of ${steps.length}`} className="space-y-5 outline-none">
         <p className="text-sm font-semibold text-slate-600" aria-live="polite">Step {i + 1} of {steps.length}</p>
 
         {step === 'location' && (
@@ -190,7 +224,17 @@ export function SubmitWizard(props: { orgName: string; hotline: string | null; c
             <p className="label text-xl">Add evidence (optional)</p>
             <p className="hint">Photos, video, audio or PDF. Location, camera, date and other hidden details are removed from every file on our server before it is stored.
               Up to {limits.maxFiles} files, {limits.imageMb} MB per photo/PDF, {limits.avMb} MB per video/audio, {limits.tipMb} MB total.</p>
-            <input aria-label="Choose files" type="file" multiple accept={props.accept} className="input" onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }} />
+            <label
+              data-dropzone
+              onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={(e) => { e.preventDefault(); setDragging(false); addFiles(Array.from(e.dataTransfer.files)); }}
+              className={`flex min-h-32 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed p-4 text-center focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-slate-900 ${dragging ? 'border-slate-900 bg-slate-100' : 'border-slate-300'}`}
+            >
+              <span className="font-semibold">Drag files here, or tap to choose</span>
+              <span className="text-sm text-slate-600">Photos, video, audio or PDF</span>
+              <input aria-label="Choose files" type="file" multiple accept={props.accept} className="sr-only" onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }} />
+            </label>
             <ul className="space-y-2">
               {files.map((f, n) => {
                 const m = mimeOf(f);
@@ -225,9 +269,15 @@ export function SubmitWizard(props: { orgName: string; hotline: string | null; c
           </div>
         )}
 
+        </div>
         <div ref={tsRef} />
         {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm font-semibold text-red-800">{error}</p>}
-        {busy && <p role="status" className="text-sm font-semibold text-slate-700">{busy}</p>}
+        {busy && (
+          <div role="status" className="space-y-1 text-sm font-semibold text-slate-700">
+            <p>{busy}{pct !== null ? ` ${pct}%` : ''}</p>
+            {pct !== null && <progress className="h-2 w-full" max={100} value={pct} aria-label="Upload progress" />}
+          </div>
+        )}
 
         <div className="flex gap-3">
           {i > 0 && <button type="button" className="btn" disabled={!!busy} onClick={() => { setError(''); setI(i - 1); }}>Back</button>}
@@ -238,7 +288,7 @@ export function SubmitWizard(props: { orgName: string; hotline: string | null; c
   );
 }
 
-function Receipt({ r, orgName, vapidKey }: { r: Result; orgName: string; vapidKey?: string }) {
+function Receipt({ r, orgName, vapidKey, helpText }: { r: Result; orgName: string; vapidKey?: string; helpText?: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <div className="card space-y-4">
@@ -259,6 +309,12 @@ function Receipt({ r, orgName, vapidKey }: { r: Result; orgName: string; vapidKe
         <p className="rounded-lg bg-red-50 p-3 text-sm font-semibold text-red-800">
           {r.attachments.failed} attachment(s) could not be processed and were not saved. Your tip itself was received. You can describe the evidence in a chat message.
         </p>
+      )}
+      {helpText && (
+        <section className="rounded-lg border border-blue-200 bg-blue-50 p-3" aria-labelledby="help-r">
+          <h2 id="help-r" className="font-bold text-blue-950">Need help right now?</h2>
+          <p className="mt-1 whitespace-pre-line text-sm text-blue-950">{helpText}</p>
+        </section>
       )}
       <PushOptIn vapidKey={vapidKey} token={r.token} />
       <div className="flex flex-wrap gap-3">
