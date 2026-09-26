@@ -1,12 +1,16 @@
 'use client';
-import { useActionState, useState } from 'react';
+import { startTransition, useActionState, useState } from 'react';
 import { setupAction } from '@/app/setup/actions';
 
 export function SetupForm() {
   const [state, action, pending] = useActionState(setupAction, undefined);
   const [type, setType] = useState('campus');
   return (
-    <form action={action} className="card space-y-5">
+    <form
+      // Submitting through startTransition (instead of the form's action prop) stops React from clearing every field when the server reports a problem.
+      onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.currentTarget); startTransition(() => action(fd)); }}
+      className="card space-y-5"
+    >
       <div>
         <label className="label" htmlFor="setupToken">Setup token</label>
         <input id="setupToken" name="setupToken" type="password" className="input" required autoComplete="off" />

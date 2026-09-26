@@ -3,6 +3,8 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { audit } from '@/lib/audit';
+import { sendTestAlert } from '@/lib/escalation';
+import { describeZodError } from '@/lib/form-errors';
 import { hashSecret, verifySecret } from '@/lib/crypto';
 import { withOrg, type Q } from '@/lib/db';
 import { StaffInputError, isUuid } from '@/lib/queue';
@@ -24,7 +26,7 @@ async function adminRun(back: string, action: string, fn: (s: Staff, q: Q) => Pr
       await audit(q, s, action, null, detail || null);
     });
   } catch (e: any) {
-    if (e instanceof StaffInputError || e instanceof z.ZodError) err = e instanceof z.ZodError ? 'Please check the highlighted fields.' : e.message;
+    if (e instanceof StaffInputError || e instanceof z.ZodError) err = e instanceof z.ZodError ? describeZodError(e, LABELS) : e.message;
     else if (e?.code === '23505') err = 'That name or email is already in use.';
     else if (e?.code === '23503') err = 'That item is still in use and cannot be removed. Deactivate it instead.';
     else throw e;
@@ -32,6 +34,13 @@ async function adminRun(back: string, action: string, fn: (s: Staff, q: Q) => Pr
   revalidatePath('/staff', 'layout');
   redirect(`${back}?${err ? `e=${encodeURIComponent(err)}` : ok ? `ok=${encodeURIComponent(ok)}` : 'ok=Saved'}`);
 }
+
+const LABELS: Record<string, string> = {
+  name: 'Name', hotline: 'Hotline', primary_color: 'Brand color', max_reward: 'Max reward', retention_days: 'Retention (days)',
+  audit_retention_days: 'Audit log retention (days)', backup_retention_days: 'Backup window (days)', image_mb: 'Photo max (MB)', doc_mb: 'PDF max (MB)',
+  av_mb: 'Video/audio max (MB)', tip_mb: 'Per-tip total (MB)', max_files: 'Max files per tip', escalation_email_mode: 'Email who',
+  escalation_webhook_url: 'Webhook URL', tipster_note: 'What to expect text', help_text: 'Help resources text',
+};
 
 const Org = z.object({
   name: z.string().trim().min(1).max(120),
@@ -48,6 +57,8 @@ const Org = z.object({
   max_files: z.coerce.number().int().min(0).max(30),
   escalation_email_mode: z.enum(['on_call', 'admins', 'off']),
   escalation_webhook_url: z.string().trim().max(500).refine((v) => v === '' || /^https:\/\//.test(v), 'Webhook must start with https://'),
+  tipster_note: z.string().trim().max(600),
+  help_text: z.string().trim().max(1200),
 });
 
 export async function saveOrgAction(fd: FormData) {
@@ -55,11 +66,21 @@ export async function saveOrgAction(fd: FormData) {
     const d = Org.parse(Object.fromEntries(fd));
     await q(
       `update organizations set name=$1, hotline=$2, primary_color=$3, max_reward_cents=$4, retention_days=$5, audit_retention_days=$6,
-         backup_retention_days=$7, image_mb=$8, doc_mb=$9, av_mb=$10, tip_mb=$11, max_files=$12, escalation_email_mode=$13, escalation_webhook_url=$14 where id=$15`,
+         backup_retention_days=$7, image_mb=$8, doc_mb=$9, av_mb=$10, tip_mb=$11, max_files=$12, escalation_email_mode=$13, escalation_webhook_url=$14, tipster_note=$15, help_text=$16 where id=$17`,
       [d.name, d.hotline || null, d.primary_color, Math.round(d.max_reward * 100), d.retention_days, d.audit_retention_days, d.backup_retention_days,
-        d.image_mb, d.doc_mb, d.av_mb, d.tip_mb, d.max_files, d.escalation_email_mode, d.escalation_webhook_url || null, s.orgId],
+        d.image_mb, d.doc_mb, d.av_mb, d.tip_mb, d.max_files, d.escalation_email_mode, d.escalation_webhook_url || null, d.tipster_note, d.help_text, s.orgId],
     );
   });
+}
+
+const CHANNEL_WORDS: Record<string, string> = { sent: 'delivered', failed: 'FAILED', not_configured: 'not set up', no_recipients: 'nobody is marked on call', simulated: 'simulated (demo)' };
+
+/** Admin-only: proves alerts reach people before a real emergency. */
+export async function testAlertAction() {
+  const s = await requireAdmin();
+  const r = await sendTestAlert(s);
+  const detail = `email: ${CHANNEL_WORDS[r.email]} (${r.recipients} on-call recipient${r.recipients === 1 ? '' : 's'}); chat webhook: ${CHANNEL_WORDS[r.webhook]}`;
+  redirect(`/staff/settings?${r.delivered ? 'ok' : 'e'}=${encodeURIComponent(r.delivered ? `Test alert sent. ${detail}.` : `The test alert was NOT delivered anywhere. ${detail}. Fix this before you rely on Escalate.`)}`);
 }
 
 // ---- Taxonomy: categories, locations, teams ----

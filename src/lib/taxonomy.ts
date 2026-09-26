@@ -4,8 +4,12 @@ type Canned = { title: string; body: string; categories?: string[] };
 type Cat = { name: string; description: string; highRisk?: boolean; teams?: string[] };
 
 // Defaults only. Everything here is copied into the org's own editable rows at setup time.
-export const TAXONOMIES: Record<OrgType, { categories: Cat[]; teams: string[]; canned: Canned[] }> = {
+const NOTE = 'A reviewer will reply here if they need more information, and it may take a while: this is not monitored in real time. Check back later, or turn on notifications below. If someone is in danger right now, call 911.';
+
+export const TAXONOMIES: Record<OrgType, { categories: Cat[]; teams: string[]; canned: Canned[]; tipsterNote: string; helpText: string }> = {
   crime_stoppers: {
+    tipsterNote: NOTE,
+    helpText: 'Were you or someone you know a victim of a crime? Ask your local victim assistance program for free support. If you are in danger right now, call 911.',
     teams: ['Tip Coordinators'],
     canned: [
       { title: 'Thanks - we are looking into this', body: 'Thank you for reaching out. A reviewer is looking into this now. If you can share more detail (who, what, where, when), reply here. You stay anonymous.' },
@@ -26,6 +30,8 @@ export const TAXONOMIES: Record<OrgType, { categories: Cat[]; teams: string[]; c
     ],
   },
   campus: {
+    tipsterNote: NOTE,
+    helpText: 'If you or someone you know is thinking about suicide or is in emotional distress, help is available any time: call or text 988 (Suicide & Crisis Lifeline, US), or text HOME to 741741 (Crisis Text Line). If someone is in immediate danger, call 911. Your organization can replace this with local resources.',
     teams: ['Administration', 'Counseling', 'School Resource Officer'],
     canned: [
       { title: 'Thanks - we are looking into this', body: 'Thank you for reaching out. A reviewer is looking into this now. If you can share more detail (who, what, where, when), reply here. You stay anonymous.' },

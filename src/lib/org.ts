@@ -18,6 +18,8 @@ export type Org = {
   max_files: number;
   escalation_email_mode: 'on_call' | 'admins' | 'off';
   escalation_webhook_url: string | null;
+  tipster_note: string;
+  help_text: string;
 };
 
 /**

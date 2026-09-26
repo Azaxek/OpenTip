@@ -47,6 +47,25 @@ export async function escalate(s: Staff, tipId: string): Promise<EscalationResul
   return { delivered, email, webhook, recipients: recipients.length };
 }
 
+const recipientsOf = async (q: import('./db').Q, mode: string) =>
+  mode === 'off' ? [] : (await q<{ email: string }>(`select email from reviewers where active and ${mode === 'admins' ? "role = 'admin'" : 'on_call'}`)).map((r) => r.email);
+
+/** Sends a clearly-labelled test through every configured channel so an admin can prove alerts arrive before an emergency. */
+export async function sendTestAlert(s: Staff): Promise<EscalationResult> {
+  if (s.role !== 'admin') throw new StaffInputError('Admins only');
+  const { org, recipients } = await withOrg(s.orgId, async (q) => {
+    const org = await orgInTx(q);
+    return { org, recipients: await recipientsOf(q, org.escalation_email_mode) };
+  });
+  const text = `TEST ALERT - ${org.name}: ${s.name} is testing escalation alerts. No action is needed. If you can read this, urgent alerts will reach you.`;
+  let [email, webhook] = await Promise.all([sendEmail(recipients, '[OpenTip] TEST alert (no action needed)', text), sendWebhook(org.escalation_webhook_url, text)]);
+  const simulated = demoMode() && email === 'not_configured' && webhook === 'not_configured';
+  if (simulated) email = webhook = 'simulated';
+  const delivered = simulated || email === 'sent' || webhook === 'sent';
+  await withOrg(s.orgId, (q) => audit(q, s, 'alert.test', null, { email, webhook, recipients: recipients.length, delivered, ...(simulated ? { simulated: true } : {}) }));
+  return { delivered, email, webhook, recipients: recipients.length };
+}
+
 async function sendEmail(to: string[], subject: string, text: string): Promise<ChannelResult> {
   if (!process.env.RESEND_API_KEY || !process.env.RESEND_FROM) return 'not_configured';
   if (!to.length) return 'no_recipients';

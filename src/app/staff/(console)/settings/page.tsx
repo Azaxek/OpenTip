@@ -4,7 +4,7 @@ import { withOrg } from '@/lib/db';
 import { orgInTx } from '@/lib/org';
 import { readiness } from '@/lib/readiness';
 import { requireAdmin } from '@/lib/session';
-import { saveOrgAction } from '../../admin-actions';
+import { saveOrgAction, testAlertAction } from '../../admin-actions';
 
 export const metadata = { title: 'Settings' };
 
@@ -67,9 +67,25 @@ export default async function Settings({ searchParams }: { searchParams: Promise
             {f('Keep audit log (days)', 'audit_retention_days', org.audit_retention_days, { type: 'number', min: 30, max: 3650 })}
             {f('Provider backup window (days)', 'backup_retention_days', org.backup_retention_days, { type: 'number', min: 0, max: 365 }, 'What your database provider keeps. Shown in the privacy notice. Verify it in your provider console.')}
           </div>
+          <h2 className="border-t border-slate-200 pt-4 font-bold">What tipsters read after they submit</h2>
+          <div>
+            <label className="label" htmlFor="tipster_note">What to expect (reply times, hours)</label>
+            <textarea id="tipster_note" name="tipster_note" defaultValue={org.tipster_note} maxLength={600} className="input min-h-20" />
+            <p className="hint">Shown above the chat on the status page. Be honest about when a person actually reads tips.</p>
+          </div>
+          <div>
+            <label className="label" htmlFor="help_text">Help resources (shown on the receipt and status page)</label>
+            <textarea id="help_text" name="help_text" defaultValue={org.help_text} maxLength={1200} className="input min-h-24" />
+            <p className="hint">Crisis lines, victim assistance, local numbers. Replace the sample text with resources for your area.</p>
+          </div>
           <button className="btn btn-primary">Save settings</button>
         </form>
 
+        <div className="space-y-4">
+        <Card title="Test your alerts">
+          <p className="mb-3 text-sm text-slate-700">Sends a clearly-labelled test through every channel you have set up (email to on-call staff and your chat webhook), and tells you what actually got through.</p>
+          <form action={testAlertAction}><button className="btn btn-primary">Send a test alert</button></form>
+        </Card>
         <Card title="Server checklist">
           <ul className="space-y-3 text-sm">
             {checks.map((c) => (
@@ -83,6 +99,7 @@ export default async function Settings({ searchParams }: { searchParams: Promise
             <strong>24/7 coverage is a staffing decision, not a feature.</strong> This app can alert people instantly; it cannot guarantee someone answers. Define an on-call rotation (ESCALATION-PROTOCOL.md) and keep the 911 notice on the form.
           </p>
         </Card>
+        </div>
       </div>
     </div>
   );

@@ -98,7 +98,7 @@ export default async function Taxonomy({ searchParams }: { searchParams: Promise
           <form action={importLocationsAction} className="mt-4 space-y-2 border-t border-slate-200 pt-3">
             <p className="label">Import schools from a CSV (SIS connector)</p>
             <p className="hint">Two columns only: <span className="font-mono">external_id,name</span>. Re-importing updates names and deactivates schools missing from the file. Files with any other column (for example student data) are rejected.</p>
-            <input type="file" name="file" accept=".csv,text/csv" className="input text-sm" required />
+            <input type="file" name="file" aria-label="CSV file with external_id and name columns" accept=".csv,text/csv" className="input text-sm" required />
             <button className="btn !min-h-8 text-xs">Import locations</button>
           </form>
         </Card>

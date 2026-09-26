@@ -100,8 +100,9 @@ export async function getTipStatus(orgId: string, tipUuid: string) {
   const rows = await withOrg(orgId, (q) =>
     q(
       `select t.status, t.created_at, c.name as category, t.reward_eligible, t.reward_amount_cents,
-              (t.claim_code_revealed_at is not null) as claim_code_shown, (t.claimed_at is not null) as claimed
-         from tips t join categories c on c.id = t.category_id where t.id = $1`,
+              (t.claim_code_revealed_at is not null) as claim_code_shown, (t.claimed_at is not null) as claimed,
+              o.tipster_note as note, o.help_text as resources
+         from tips t join categories c on c.id = t.category_id join organizations o on o.id = t.org_id where t.id = $1`,
       [tipUuid],
     ),
   );
